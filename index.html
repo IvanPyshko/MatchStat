@@ -1,955 +1,253 @@
-```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MatchStat — карточка игрока</title>
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&display=swap" rel="stylesheet">
-
 <style>
-:root {
-    --gold1:#f6e7a1;
-    --gold2:#d9b44a;
-    --gold3:#a97c1f;
-    --ink:#3a2a08;
-}
-
-* {
-    box-sizing:border-box;
-}
-
-html {
-    min-height:100%;
-    background:#111;
-}
-
-body {
-    min-height:100vh;
-    margin:0;
-    padding:16px;
-    position:relative;
-    isolation:isolate;
-    background:transparent;
-    font-family:'Oswald',sans-serif;
-    color:white;
-}
-
-/* ===== ФОНОВОЕ ИЗОБРАЖЕНИЕ ===== */
-
-body::before {
-    content:"";
-    position:fixed;
-    inset:0;
-    z-index:-1;
-    pointer-events:none;
-
-    background-color:#111;
-
-    background-image:
+  :root { --gold1:#f6e7a1; --gold2:#d9b44a; --gold3:#a97c1f; --ink:#3a2a08; }
+  * { box-sizing:border-box; }
+  body {
+        background:
         linear-gradient(
-            rgba(0,0,0,0.45),
-            rgba(0,0,0,0.70)
+            rgba(0, 0, 0, 0.65),
+            rgba(0, 0, 0, 0.75)
         ),
-        url("https://jndrxhmlgamzlqcfpqun.supabase.co/storage/v1/object/public/font_and_picturess/bodyfont.png");
+        url('https://jndrxhmlgamzlqcfpqun.supabase.co/storage/v1/object/public/font_and_picturess/bodyfont.png');
 
-    background-size:cover;
-    background-position:center center;
-    background-repeat:no-repeat;
-}
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+  select { font:inherit; padding:9px 12px; border-radius:10px; border:0; background:#e9eef6; width:min(100%,360px); }
+  .wrap { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:28px; width:100%; }
 
-/* ===== ОСНОВНАЯ РАЗМЕТКА ===== */
-
-select {
-    font:inherit;
-    padding:9px 12px;
-    border-radius:10px;
-    border:0;
-    background:#e9eef6;
-    width:min(100%,360px);
-    margin-bottom:20px;
-}
-
-.wrap {
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
-    align-items:center;
-    gap:28px;
-    width:100%;
-}
-
-/* ===== КАРТОЧКА ИГРОКА ===== */
-
-.card {
-    position:relative;
-    font-size:clamp(14px,4.8vw,21px);
-    color:var(--ink);
-    width:20em;
-    height:29.4em;
-    padding:1.6em 1.5em;
-    flex:none;
-
-    background:linear-gradient(
-        155deg,
-        var(--gold1) 0%,
-        var(--gold2) 45%,
-        var(--gold3) 100%
-    );
-
-    clip-path:polygon(
-        50% 0,
-        88% 5%,
-        100% 9%,
-        100% 88%,
-        50% 100%,
-        0 88%,
-        0 9%,
-        12% 5%
-    );
-
+  /* ===== Карточка: всё в em, размер задаётся font-size ===== */
+  .card {
+    position:relative; font-size:clamp(14px, 4.8vw, 21px); color:var(--ink);
+    width:20em; height:29.4em; padding:1.6em 1.5em; flex:none;
+    background:linear-gradient(155deg,var(--gold1) 0%,var(--gold2) 45%,var(--gold3) 100%);
+    clip-path:polygon(50% 0,88% 5%,100% 9%,100% 88%,50% 100%,0 88%,0 9%,12% 5%);
     filter:drop-shadow(0 12px 24px rgba(0,0,0,.5));
-}
+  }
+  .card::before { content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(115deg,rgba(255,255,255,.18) 0 2px,transparent 2px 26px); }
+  .top { display:flex; height:12.5em; position:relative; }
+  .left { width:5.25em; padding-top:2.1em; text-align:center; }
+  .rating { font-size:3.4em; font-weight:700; line-height:1; }
+  .rl { font-size:.75em; letter-spacing:2px; font-weight:600; }
+  .prod { margin-top:.9em; font-size:.7em; letter-spacing:1px; border-top:2px solid rgba(58,42,8,.45); padding-top:.7em; }
+  .prod b { display:block; font-size:1.8em; }
+  .photo { position:absolute; right:-.25em; bottom:0; width:11.9em; height:11.9em; display:flex; align-items:flex-end; justify-content:center; }
+  .photo img { max-width:100%; max-height:100%; object-fit:contain; object-position:bottom; }
+  .ph { font-size:5.6em; opacity:.35; }
+  /* имя: фиксированная высота, одна строка, шрифт подгоняется под ширину */
+  .namebox { height:2.4em; margin-top:.4em; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    border-bottom:2px solid rgba(58,42,8,.45); }
+  .nm { display:inline-block; white-space:nowrap; font-size:1.7em; font-weight:700; text-transform:uppercase; letter-spacing:1px; line-height:1.1; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(3,auto); grid-auto-flow:column; gap:.4em .6em; padding:.9em .4em 0; }
+  .stat { display:flex; align-items:baseline; gap:.4em; font-size:1.4em; font-weight:700; white-space:nowrap; }
+  .stat span { font-size:.6em; font-weight:400; letter-spacing:.5px; }
+  .stat:nth-child(-n+3) { border-right:2px solid rgba(58,42,8,.35); }
 
-.card::before {
-    content:"";
-    position:absolute;
-    inset:0;
-    pointer-events:none;
+  /* ===== Боковая панель ===== */
+  .side { width:min(100%,440px); display:grid; gap:12px; }
+  .panel { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:16px 18px; backdrop-filter:blur(6px); }
+  .ptitle { font-size:13px; letter-spacing:2px; color:#9fb4d3; text-transform:uppercase; margin-bottom:12px; }
+  .tile + .tile { margin-top:14px; }
+  .trow { display:flex; justify-content:space-between; align-items:baseline; }
+  .tl { font-size:16px; letter-spacing:.5px; color:#dbe6f6; }
+  .tv { font-size:28px; font-weight:700; color:var(--gold1); }
+  .tv small { font-size:14px; font-weight:400; color:#9fb4d3; margin-left:4px; }
+  .bar { height:8px; border-radius:6px; background:rgba(255,255,255,.12); margin-top:6px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,var(--gold3),var(--gold1)); }
+  .totals { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center; }
+  .totals div { background:rgba(255,255,255,.06); border-radius:12px; padding:10px 4px; }
+  .totals b { display:block; font-size:26px; color:var(--gold1); }
+  .totals span { font-size:12px; letter-spacing:1px; color:#9fb4d3; }
 
-    background:repeating-linear-gradient(
-        115deg,
-        rgba(255,255,255,.18) 0 2px,
-        transparent 2px 26px
-    );
-}
-
-.top {
-    display:flex;
-    height:12.5em;
-    position:relative;
-}
-
-.left {
-    width:5.25em;
-    padding-top:2.1em;
-    text-align:center;
-}
-
-.rating {
-    font-size:3.4em;
-    font-weight:700;
-    line-height:1;
-}
-
-.rl {
-    font-size:.75em;
-    letter-spacing:2px;
-    font-weight:600;
-}
-
-.prod {
-    margin-top:.9em;
-    font-size:.7em;
-    letter-spacing:1px;
-    border-top:2px solid rgba(58,42,8,.45);
-    padding-top:.7em;
-}
-
-.prod b {
-    display:block;
-    font-size:1.8em;
-}
-
-.photo {
-    position:absolute;
-    right:-.25em;
-    bottom:0;
-    width:11.9em;
-    height:11.9em;
-    display:flex;
-    align-items:flex-end;
-    justify-content:center;
-}
-
-.photo img {
-    max-width:100%;
-    max-height:100%;
-    object-fit:contain;
-    object-position:bottom;
-}
-
-.ph {
-    font-size:5.6em;
-    opacity:.35;
-}
-
-/* ИМЯ ИГРОКА */
-
-.namebox {
-    height:2.4em;
-    margin-top:.4em;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
-    border-bottom:2px solid rgba(58,42,8,.45);
-}
-
-.nm {
-    display:inline-block;
-    white-space:nowrap;
-    font-size:1.7em;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:1px;
-    line-height:1.1;
-}
-
-/* СТАТИСТИКА */
-
-.stats {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    grid-template-rows:repeat(3,auto);
-    grid-auto-flow:column;
-    gap:.4em .6em;
-    padding:.9em .4em 0;
-}
-
-.stat {
-    display:flex;
-    align-items:baseline;
-    gap:.4em;
-    font-size:1.4em;
-    font-weight:700;
-    white-space:nowrap;
-}
-
-.stat span {
-    font-size:.6em;
-    font-weight:400;
-    letter-spacing:.5px;
-}
-
-.stat:nth-child(-n+3) {
-    border-right:2px solid rgba(58,42,8,.35);
-}
-
-/* ===== БОКОВАЯ ПАНЕЛЬ ===== */
-
-.side {
-    width:min(100%,440px);
-    display:grid;
-    gap:12px;
-}
-
-.panel {
-    background:rgba(255,255,255,.07);
-    border:1px solid rgba(255,255,255,.14);
-    border-radius:16px;
-    padding:16px 18px;
-    backdrop-filter:blur(6px);
-}
-
-.ptitle {
-    font-size:13px;
-    letter-spacing:2px;
-    color:#9fb4d3;
-    text-transform:uppercase;
-    margin-bottom:12px;
-}
-
-.tile + .tile {
-    margin-top:14px;
-}
-
-.trow {
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-}
-
-.tl {
-    font-size:16px;
-    letter-spacing:.5px;
-    color:#dbe6f6;
-}
-
-.tv {
-    font-size:28px;
-    font-weight:700;
-    color:var(--gold1);
-}
-
-.tv small {
-    font-size:14px;
-    font-weight:400;
-    color:#9fb4d3;
-    margin-left:4px;
-}
-
-.bar {
-    height:8px;
-    border-radius:6px;
-    background:rgba(255,255,255,.12);
-    margin-top:6px;
-    overflow:hidden;
-}
-
-.bar i {
-    display:block;
-    height:100%;
-    border-radius:6px;
-    background:linear-gradient(90deg,var(--gold3),var(--gold1));
-}
-
-.totals {
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:10px;
-    text-align:center;
-}
-
-.totals div {
-    background:rgba(255,255,255,.06);
-    border-radius:12px;
-    padding:10px 4px;
-}
-
-.totals b {
-    display:block;
-    font-size:26px;
-    color:var(--gold1);
-}
-
-.totals span {
-    font-size:12px;
-    letter-spacing:1px;
-    color:#9fb4d3;
-}
-
-/* ===== МУЗЫКА ===== */
-
-#music,
-#trackLink {
-    position:fixed;
-    z-index:10;
-    right:calc(16px + env(safe-area-inset-right,0px));
-    bottom:calc(16px + env(safe-area-inset-bottom,0px));
-
-    height:54px;
-    min-width:54px;
-    border-radius:27px;
-    border:0;
-
-    background:linear-gradient(
-        135deg,
-        var(--gold1),
-        var(--gold3)
-    );
-
-    color:var(--ink);
-    font:700 20px 'Oswald',sans-serif;
-    cursor:pointer;
-
-    box-shadow:0 6px 18px rgba(0,0,0,.45);
-
-    display:flex;
-    align-items:center;
-    justify-content:center;
-
-    padding:0 18px;
-    text-decoration:none;
-}
-
-#music[hidden],
-#trackLink[hidden] {
-    display:none;
-}
-
-#music.on {
-    animation:pulse 1.6s infinite;
-}
-
-@keyframes pulse {
-    50% {
-        box-shadow:
-            0 0 0 10px rgba(246,231,161,.18),
-            0 6px 18px rgba(0,0,0,.45);
-    }
-}
-
-.err {
-    color:#ffb4b4;
-    max-width:420px;
-    text-align:center;
-    font-family:Arial,sans-serif;
-}
-
-/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
-
-@media(max-width:600px) {
-    body {
-        padding:12px;
-    }
-
-    .wrap {
-        gap:18px;
-    }
-
-    .side {
-        width:100%;
-    }
-}
+  /* ===== Музыка ===== */
+  #music, #trackLink { position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px));
+    height:54px; min-width:54px; border-radius:27px; border:0; background:linear-gradient(135deg,var(--gold1),var(--gold3)); color:var(--ink);
+    font:700 20px 'Oswald',sans-serif; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:0 18px; text-decoration:none; }
+  #music[hidden], #trackLink[hidden] { display:none; }
+  #music.on { animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 0 10px rgba(246,231,161,.18), 0 6px 18px rgba(0,0,0,.45); } }
+  .err { color:#ffb4b4; max-width:420px; text-align:center; font-family:Arial,sans-serif; }
 </style>
 </head>
-
 <body>
-
-<select id="picker" aria-label="Игрок"></select>
-
-<div class="wrap" id="root"></div>
-
-<button id="music" hidden aria-label="Музыка">♪</button>
-<a id="trackLink" hidden target="_blank" rel="noopener">♪ Трек</a>
+  <select id="picker" aria-label="Игрок"></select>
+  <div class="wrap" id="root"></div>
+  <button id="music" hidden aria-label="Музыка">♪</button>
+  <a id="trackLink" hidden target="_blank" rel="noopener">♪ Трек</a>
 
 <script>
-
-// ====== НАСТРОЙКИ SUPABASE ======
-
+// ====== НАСТРОЙКИ ======
 const SUPABASE_URL = "https://jndrxhmlgamzlqcfpqun.supabase.co";
 const SUPABASE_KEY = "sb_publishable_lT94AQ-q-57M620LTo3NYQ_2zXO53GO";
-
 const PHOTO_BUCKET = "player-photos";
 const MUSIC_BUCKET = "player-music";
 
-const H = {
-    apikey: SUPABASE_KEY,
-    "Content-Type": "application/json"
-};
-
+const H = { apikey: SUPABASE_KEY, "Content-Type": "application/json" };
 const REST = SUPABASE_URL + "/rest/v1/";
-
-const pub = (bucket, p) =>
-    `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(p)}`;
-
+const pub = (bucket, p) => `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(p)}`;
 const isUrl = v => /^https?:\/\//i.test(v);
-
-const fmt = (v, d = 0) =>
-    v == null ? "—" : Number(v).toLocaleString("ru", {
-        maximumFractionDigits: d
-    });
+const fmt = (v, d = 0) => v == null ? "—" : Number(v).toLocaleString("ru", { maximumFractionDigits: d });
 
 async function api(path, opts) {
-    const r = await fetch(REST + path, {
-        headers: H,
-        ...opts
-    });
-
-    if (!r.ok) {
-        throw new Error(`Ошибка запроса (${r.status})`);
-    }
-
-    return r.json();
+  const r = await fetch(REST + path, { headers: H, ...opts });
+  if (!r.ok) throw new Error(`Ошибка запроса (${r.status})`);
+  return r.json();
 }
+const getPlayers = () => api("players?select=id,name&order=name");
+const getStats = async id => (await api("rpc/get_player_overall_stats", { method: "POST", body: JSON.stringify({ p_player_id: id }) }))[0];
+const getMusicLink = async id => (await api(`players?select=music_track_link&id=eq.${id}`))[0]?.music_track_link || null;
 
-const getPlayers = () =>
-    api("players?select=id,name&order=name");
-
-const getStats = async id =>
-    (await api("rpc/get_player_overall_stats", {
-        method: "POST",
-        body: JSON.stringify({
-            p_player_id: id
-        })
-    }))[0];
-
-const getMusicLink = async id =>
-    (await api(`players?select=music_track_link&id=eq.${id}`))[0]?.music_track_link || null;
-
-
-// ====== МАКСИМУМЫ ПО ВСЕМ ИГРОКАМ ======
-
+// максимумы по всем игрокам — для длины полосок
 let MAX = {};
-
 async function loadMax() {
-    try {
-        const rows = await api(
-            "player_overall_stats?select=avg_points_per_tour,avg_goals_per_tour,avg_assists_per_tour,avg_goal_assists_per_tour"
-        );
-
-        for (const k of [
-            "avg_points_per_tour",
-            "avg_goals_per_tour",
-            "avg_assists_per_tour",
-            "avg_goal_assists_per_tour"
-        ]) {
-            MAX[k] = Math.max(
-                0,
-                ...rows.map(r => Number(r[k]) || 0)
-            );
-        }
-    } catch (e) {
-        console.error("Ошибка загрузки максимумов:", e);
-    }
+  try {
+    const rows = await api("player_overall_stats?select=avg_points_per_tour,avg_goals_per_tour,avg_assists_per_tour,avg_goal_assists_per_tour");
+    for (const k of ["avg_points_per_tour","avg_goals_per_tour","avg_assists_per_tour","avg_goal_assists_per_tour"])
+      MAX[k] = Math.max(0, ...rows.map(r => Number(r[k]) || 0));
+  } catch (e) { /* оставляем прежние значения */ }
 }
 
-
-// ====== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ======
-
-function el(tag, cls, text) {
-    const e = document.createElement(tag);
-
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-
-    return e;
-}
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 function fitName(box, nm) {
-    let f = 1.7;
-
-    nm.style.fontSize = f + "em";
-
-    while (nm.offsetWidth > box.clientWidth && f > 0.8) {
-        f -= 0.05;
-        nm.style.fontSize = f + "em";
-    }
+  let f = 1.7; nm.style.fontSize = f + "em";
+  while (nm.offsetWidth > box.clientWidth && f > 0.8) { f -= 0.05; nm.style.fontSize = f + "em"; }
 }
 
 function tile(label, value, max, suffix) {
-    const t = el("div", "tile");
-    const row = el("div", "trow");
-
-    const tv = el("div", "tv", fmt(value, 2));
-
-    if (suffix) {
-        tv.append(el("small", null, suffix));
-    }
-
-    row.append(
-        el("div", "tl", label),
-        tv
-    );
-
-    const bar = el("div", "bar");
-    const i = el("i");
-
-    i.style.width =
-        (max > 0
-            ? Math.min(100, (Number(value) || 0) / max * 100)
-            : 0
-        ) + "%";
-
-    bar.append(i);
-    t.append(row, bar);
-
-    return t;
+  const t = el("div", "tile"), row = el("div", "trow");
+  const tv = el("div", "tv", fmt(value, 2)); if (suffix) tv.append(el("small", null, suffix));
+  row.append(el("div", "tl", label), tv);
+  const bar = el("div", "bar"), i = el("i");
+  i.style.width = (max > 0 ? Math.min(100, (Number(value) || 0) / max * 100) : 0) + "%";
+  bar.append(i); t.append(row, bar); return t;
 }
-
-
-// ====== ОТОБРАЖЕНИЕ КАРТОЧКИ ======
 
 function render(s) {
-    const root = document.getElementById("root");
+  const root = document.getElementById("root");
+  root.replaceChildren();
+  if (!s) { root.append(el("p", "err", "Нет данных по этому игроку")); return; }
 
-    root.replaceChildren();
+  // --- карточка ---
+  const card = el("div", "card"), top = el("div", "top"), left = el("div", "left");
+  left.append(el("div", "rating", fmt(s.rating, 1)), el("div", "rl", "РЕЙТИНГ"));
+  const prod = el("div", "prod", "ЦЕННОСТЬ"); prod.append(el("b", null, fmt(s.productivity_value, 2))); left.append(prod);
 
-    if (!s) {
-        root.append(
-            el("p", "err", "Нет данных по этому игроку")
-        );
-        return;
-    }
+  const photo = el("div", "photo");
+  if (s.photo_url) {
+    const img = new Image(); img.alt = s.player_name;
+    img.onerror = () => photo.replaceChildren(el("div", "ph", "👤"));
+    img.src = isUrl(s.photo_url) ? s.photo_url : pub(PHOTO_BUCKET, s.photo_url);
+    photo.append(img);
+  } else photo.append(el("div", "ph", "👤"));
+  top.append(left, photo);
 
-    // --- Карточка ---
+  const box = el("div", "namebox"), nm = el("span", "nm", s.player_name); box.append(nm);
 
-    const card = el("div", "card");
-    const top = el("div", "top");
-    const left = el("div", "left");
+  const stats = el("div", "stats");
+  [["ГОЛЫ", s.goals], ["ПАСЫ", s.assists], ["Г+П", s.goal_assists],
+   ["ТУРЫ", s.played_tours], ["ОЧКИ", s.points], ["ПОСЕЩЕНИЕ", s.attendance_pct == null ? null : fmt(s.attendance_pct, 0) + "%"]]
+    .forEach(([label, v]) => { const r = el("div", "stat", typeof v === "string" ? v : fmt(v)); r.append(el("span", null, label)); stats.append(r); });
+  card.append(top, box, stats);
 
-    left.append(
-        el("div", "rating", fmt(s.rating, 1)),
-        el("div", "rl", "РЕЙТИНГ")
-    );
+  // --- боковая панель ---
+  const side = el("div", "side");
+  const avg = el("div", "panel"); avg.append(el("div", "ptitle", "В среднем за тур"));
+  avg.append(
+    tile("Очки", s.avg_points_per_tour, MAX.avg_points_per_tour),
+    tile("Голы", s.avg_goals_per_tour, MAX.avg_goals_per_tour),
+    tile("Пасы", s.avg_assists_per_tour, MAX.avg_assists_per_tour),
+    tile("Г+П", s.avg_goal_assists_per_tour, MAX.avg_goal_assists_per_tour));
+  const att = el("div", "panel"); att.append(el("div", "ptitle", "Активность"));
+  att.append(tile("Посещаемость", s.attendance_pct, 100, "%"), tile("Ценность", s.productivity_value, Math.max(3, Number(s.productivity_value) || 0)));
+  const tot = el("div", "panel"); tot.append(el("div", "ptitle", "Всего"));
+  const g = el("div", "totals");
+  [["ТУРЫ", s.played_tours], ["ОЧКИ", s.points], ["ГОЛЫ", s.goals], ["ПАСЫ", s.assists], ["Г+П", s.goal_assists], ["РЕЙТИНГ", fmt(s.rating, 2)]]
+    .forEach(([l, v]) => { const d = el("div"); d.append(el("b", null, typeof v === "string" ? v : fmt(v)), el("span", null, l)); g.append(d); });
+  tot.append(g);
+  side.append(avg, att, tot);
 
-    const prod = el("div", "prod", "ЦЕННОСТЬ");
-
-    prod.append(
-        el("b", null, fmt(s.productivity_value, 2))
-    );
-
-    left.append(prod);
-
-    // Фото игрока
-
-    const photo = el("div", "photo");
-
-    if (s.photo_url) {
-        const img = new Image();
-
-        img.alt = s.player_name;
-
-        img.onerror = () => {
-            photo.replaceChildren(
-                el("div", "ph", "👤")
-            );
-        };
-
-        img.src = isUrl(s.photo_url)
-            ? s.photo_url
-            : pub(PHOTO_BUCKET, s.photo_url);
-
-        photo.append(img);
-
-    } else {
-        photo.append(
-            el("div", "ph", "👤")
-        );
-    }
-
-    top.append(left, photo);
-
-    // Имя
-
-    const box = el("div", "namebox");
-    const nm = el("span", "nm", s.player_name);
-
-    box.append(nm);
-
-    // Статистика
-
-    const stats = el("div", "stats");
-
-    [
-        ["ГОЛЫ", s.goals],
-        ["ПАСЫ", s.assists],
-        ["Г+П", s.goal_assists],
-        ["ТУРЫ", s.played_tours],
-        ["ОЧКИ", s.points],
-        [
-            "ПОСЕЩЕНИЕ",
-            s.attendance_pct == null
-                ? null
-                : fmt(s.attendance_pct, 0) + "%"
-        ]
-    ].forEach(([label, v]) => {
-        const r = el(
-            "div",
-            "stat",
-            typeof v === "string" ? v : fmt(v)
-        );
-
-        r.append(
-            el("span", null, label)
-        );
-
-        stats.append(r);
-    });
-
-    card.append(top, box, stats);
-
-    // --- Боковая панель ---
-
-    const side = el("div", "side");
-
-    // Средние показатели
-
-    const avg = el("div", "panel");
-
-    avg.append(
-        el("div", "ptitle", "В среднем за тур")
-    );
-
-    avg.append(
-        tile("Очки", s.avg_points_per_tour, MAX.avg_points_per_tour),
-        tile("Голы", s.avg_goals_per_tour, MAX.avg_goals_per_tour),
-        tile("Пасы", s.avg_assists_per_tour, MAX.avg_assists_per_tour),
-        tile("Г+П", s.avg_goal_assists_per_tour, MAX.avg_goal_assists_per_tour)
-    );
-
-    // Активность
-
-    const att = el("div", "panel");
-
-    att.append(
-        el("div", "ptitle", "Активность")
-    );
-
-    att.append(
-        tile("Посещаемость", s.attendance_pct, 100, "%"),
-        tile(
-            "Ценность",
-            s.productivity_value,
-            Math.max(3, Number(s.productivity_value) || 0)
-        )
-    );
-
-    // Общая статистика
-
-    const tot = el("div", "panel");
-
-    tot.append(
-        el("div", "ptitle", "Всего")
-    );
-
-    const g = el("div", "totals");
-
-    [
-        ["ТУРЫ", s.played_tours],
-        ["ОЧКИ", s.points],
-        ["ГОЛЫ", s.goals],
-        ["ПАСЫ", s.assists],
-        ["Г+П", s.goal_assists],
-        ["РЕЙТИНГ", fmt(s.rating, 2)]
-    ].forEach(([l, v]) => {
-        const d = el("div");
-
-        d.append(
-            el(
-                "b",
-                null,
-                typeof v === "string" ? v : fmt(v)
-            ),
-            el("span", null, l)
-        );
-
-        g.append(d);
-    });
-
-    tot.append(g);
-
-    side.append(avg, att, tot);
-
-    root.append(card, side);
-
-    fitName(box, nm);
-
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(
-            () => fitName(box, nm)
-        );
-    }
+  root.append(card, side);
+  fitName(box, nm);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitName(box, nm));
 }
-
 
 // ====== МУЗЫКА ======
-
-const audio = new Audio();
-
-audio.loop = true;
-
-const btn = document.getElementById("music");
-const link = document.getElementById("trackLink");
-
-let hasTrack = false;
-let userPaused = false;
-
-const sync = () => {
-    btn.textContent = audio.paused ? "♪" : "❚❚";
-    btn.classList.toggle("on", !audio.paused);
-};
-
+const audio = new Audio(); audio.loop = true;
+const btn = document.getElementById("music"), link = document.getElementById("trackLink");
+let hasTrack = false, userPaused = false;
+const sync = () => { btn.textContent = audio.paused ? "♪" : "❚❚"; btn.classList.toggle("on", !audio.paused); };
 audio.onplay = audio.onpause = sync;
-
-audio.onerror = () => {
-    hasTrack = false;
-    btn.hidden = true;
-};
-
-function tryPlay() {
-    if (hasTrack && !userPaused) {
-        audio.play().catch(() => {});
-    }
-}
-
-btn.onclick = () => {
-    if (audio.paused) {
-        userPaused = false;
-        audio.play().catch(() => {});
-    } else {
-        userPaused = true;
-        audio.pause();
-    }
-};
-
-// Автозапуск после первого взаимодействия
-
-["pointerdown", "keydown"].forEach(ev => {
-    addEventListener(ev, e => {
-        if (e.target.closest && e.target.closest("#music")) {
-            return;
-        }
-
-        if (audio.paused) {
-            tryPlay();
-        }
-    });
-});
+audio.onerror = () => { hasTrack = false; btn.hidden = true; };
+function tryPlay() { if (hasTrack && !userPaused) audio.play().catch(() => {}); }
+btn.onclick = () => { if (audio.paused) { userPaused = false; audio.play().catch(() => {}); } else { userPaused = true; audio.pause(); } };
+// браузеры запрещают автозапуск со звуком — стартуем при первом касании или клике
+["pointerdown", "keydown"].forEach(ev => addEventListener(ev, e => {
+  if (e.target.closest && e.target.closest("#music")) return;
+  if (audio.paused) tryPlay();
+}));
 
 function setMusic(v) {
-    audio.pause();
-
-    hasTrack = false;
-    btn.hidden = true;
-    link.hidden = true;
-
-    if (!v) return;
-
-    if (
-        isUrl(v) &&
-        !/\.(mp3|m4a|aac|ogg|wav|webm)(\?|$)/i.test(v) &&
-        !v.includes("/storage/v1/object/")
-    ) {
-        link.href = v;
-        link.hidden = false;
-        return;
-    }
-
-    audio.src = isUrl(v)
-        ? v
-        : pub(MUSIC_BUCKET, v);
-
-    hasTrack = true;
-
-    btn.hidden = false;
-
-    sync();
-    tryPlay();
+  audio.pause(); hasTrack = false; btn.hidden = true; link.hidden = true;
+  if (!v) return;
+  if (isUrl(v) && !/\.(mp3|m4a|aac|ogg|wav|webm)(\?|$)/i.test(v) && !v.includes("/storage/v1/object/")) {
+    link.href = v; link.hidden = false; return; // не аудиофайл (YouTube, Spotify…) — просто ссылка
+  }
+  audio.src = isUrl(v) ? v : pub(MUSIC_BUCKET, v);
+  hasTrack = true; btn.hidden = false; sync(); tryPlay();
 }
-
-
-// ====== ВЫБОР ИГРОКА ======
 
 const picker = document.getElementById("picker");
-
-const REFRESH_MS = 10000;
-
-let lastSig = "";
-let curMusic;
-
+const REFRESH_MS = 10000; // как часто проверять новые данные
+let lastSig = "", curMusic;
 
 async function show(id) {
-    try {
-        const s = await getStats(id);
-
-        lastSig = JSON.stringify([s, MAX]);
-
-        render(s);
-
-        getMusicLink(id)
-            .then(m => {
-                if (id === picker.value) {
-                    curMusic = m;
-                    setMusic(m);
-                }
-            })
-            .catch(() => {
-                curMusic = null;
-                setMusic(null);
-            });
-
-    } catch (e) {
-        document.getElementById("root").replaceChildren(
-            el("p", "err", e.message)
-        );
-    }
+  try {
+    const s = await getStats(id);
+    lastSig = JSON.stringify([s, MAX]); render(s);
+    getMusicLink(id).then(m => { if (id === picker.value) { curMusic = m; setMusic(m); } })
+                    .catch(() => { curMusic = null; setMusic(null); });
+  } catch (e) { document.getElementById("root").replaceChildren(el("p", "err", e.message)); }
 }
 
-
-// ====== АВТООБНОВЛЕНИЕ ======
-
+// тихое автообновление: перерисовываем только если данные изменились
 let busy = false;
-
 async function refresh() {
-    if (
-        busy ||
-        document.hidden ||
-        !picker.value
-    ) {
-        return;
-    }
-
-    busy = true;
-
-    const id = picker.value;
-
-    try {
-        const [s] = await Promise.all([
-            getStats(id),
-            loadMax()
-        ]);
-
-        const sig = JSON.stringify([s, MAX]);
-
-        if (id === picker.value && sig !== lastSig) {
-            lastSig = sig;
-            render(s);
-        }
-
-        const m = await getMusicLink(id);
-
-        if (id === picker.value && m !== curMusic) {
-            curMusic = m;
-            setMusic(m);
-        }
-
-    } catch (e) {
-        console.error("Ошибка автообновления:", e);
-    } finally {
-        busy = false;
-    }
+  if (busy || document.hidden || !picker.value) return;
+  busy = true;
+  const id = picker.value;
+  try {
+    const [s] = await Promise.all([getStats(id), loadMax()]);
+    const sig = JSON.stringify([s, MAX]);
+    if (id === picker.value && sig !== lastSig) { lastSig = sig; render(s); }
+    const m = await getMusicLink(id);
+    if (id === picker.value && m !== curMusic) { curMusic = m; setMusic(m); }
+  } catch (e) { /* нет сети — оставляем старые данные, попробуем в следующий раз */ }
+  finally { busy = false; }
 }
-
 setInterval(refresh, REFRESH_MS);
-
-document.addEventListener(
-    "visibilitychange",
-    () => {
-        if (!document.hidden) refresh();
-    }
-);
-
-
-// ====== ЗАПУСК ======
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 
 (async () => {
-    try {
-        const [players] = await Promise.all([
-            getPlayers(),
-            loadMax()
-        ]);
-
-        players.forEach(p => {
-            const o = el("option", null, p.name);
-            o.value = p.id;
-            picker.append(o);
-        });
-
-        const fromUrl = new URLSearchParams(location.search).get("id");
-
-        if (fromUrl) {
-            picker.value = fromUrl;
-        }
-
-        picker.onchange = () => show(picker.value);
-
-        if (players.length) {
-            show(picker.value);
-        }
-
-    } catch (e) {
-        document.getElementById("root").append(
-            el("p", "err", e.message)
-        );
-    }
+  try {
+    const [players] = await Promise.all([getPlayers(), loadMax()]);
+    players.forEach(p => { const o = el("option", null, p.name); o.value = p.id; picker.append(o); });
+    const fromUrl = new URLSearchParams(location.search).get("id");
+    if (fromUrl) picker.value = fromUrl;
+    picker.onchange = () => show(picker.value);
+    if (players.length) show(picker.value);
+  } catch (e) { document.getElementById("root").append(el("p", "err", e.message)); }
 })();
-
 </script>
-
 </body>
 </html>
-```
