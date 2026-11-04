@@ -14,14 +14,12 @@
     background: radial-gradient(circle at 50% 20%, #1f3a5f, #0b1320 75%) fixed;
     font-family:'Oswald','Arial Narrow',Impact,sans-serif; color:#fff;
   }
-  /* ===== Заголовок лиги ===== */
   .league-title {
     margin:0; text-align:center; font-size:clamp(20px, 5.5vw, 34px); font-weight:700;
     letter-spacing:3px; text-transform:uppercase; line-height:1.1;
     color:var(--gold1);
     text-shadow:0 2px 0 var(--gold3), 0 6px 18px rgba(0,0,0,.55);
   }
-  /* ===== Панель выбора: игрок + сезон ===== */
   .controls {
     display:flex; flex-wrap:wrap; justify-content:center; align-items:center;
     gap:10px; width:100%;
@@ -29,7 +27,7 @@
   select { font:inherit; padding:9px 12px; border-radius:10px; border:0; background:#e9eef6; width:min(100%,260px); }
   .wrap { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:28px; width:100%; }
 
-  /* ===== Карточка: всё в em, размер задаётся font-size ===== */
+  /* ===== Карточка ===== */
   .card {
     position:relative; font-size:clamp(14px, 4.8vw, 21px); color:var(--ink);
     width:20em; height:29.4em; padding:1.6em 1.5em; flex:none;
@@ -63,10 +61,10 @@
   /* ===== Боковая панель ===== */
   .side { width:min(100%,440px); display:grid; gap:12px; }
   .panel { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:16px 18px; backdrop-filter:blur(6px); }
-  .ptitle { font-size:13px; letter-spacing:2px; color:#9fb4d3; text-transform:uppercase; margin-bottom:12px; }
+  .ptitle { font-size:13px; letter-spacing:2px; color:#9fb4d3; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
   .tile + .tile { margin-top:14px; }
-  .trow { display:flex; justify-content:space-between; align-items:baseline; }
-  .tl { font-size:16px; letter-spacing:.5px; color:#dbe6f6; }
+  .trow { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .tl { font-size:16px; letter-spacing:.5px; color:#dbe6f6; display:flex; align-items:center; gap:6px; }
   .tv { font-size:28px; font-weight:700; color:var(--gold1); }
   .tv small { font-size:14px; font-weight:400; color:#9fb4d3; margin-left:4px; }
   .bar { height:8px; border-radius:6px; background:rgba(255,255,255,.12); margin-top:6px; overflow:hidden; }
@@ -74,7 +72,34 @@
   .totals { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center; }
   .totals div { background:rgba(255,255,255,.06); border-radius:12px; padding:10px 4px; }
   .totals b { display:block; font-size:26px; color:var(--gold1); }
-  .totals span { font-size:12px; letter-spacing:1px; color:#9fb4d3; }
+  .totals span { font-size:12px; letter-spacing:1px; color:#9fb4d3; display:inline-flex; align-items:center; justify-content:center; gap:4px; }
+
+  /* ===== Кружок с вопросом и подсказка ===== */
+  .hint { position:relative; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .hint > button {
+    all:unset; box-sizing:border-box; width:16px; height:16px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    font:700 11px/1 'Oswald',sans-serif; color:#0b1320;
+    background:rgba(159,180,211,.55);
+    cursor:pointer; user-select:none;
+    transition:background .15s, color .15s;
+  }
+  .hint > button:hover, .hint > button:focus-visible { background:var(--gold1); color:var(--ink); outline:none; }
+  .hint .tip {
+    position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%) translateY(4px);
+    min-width:180px; max-width:260px; padding:8px 10px; border-radius:10px;
+    background:#0e1a2b; color:#e8eef8; font-size:12.5px; font-weight:400; line-height:1.35; letter-spacing:.2px;
+    box-shadow:0 8px 22px rgba(0,0,0,.5); border:1px solid rgba(246,231,161,.25);
+    opacity:0; pointer-events:none; transition:opacity .15s, transform .15s;
+    z-index:20; white-space:normal; text-align:left;
+  }
+  .hint .tip::after {
+    content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    border:6px solid transparent; border-top-color:#0e1a2b;
+  }
+  .hint.open .tip, .hint:hover .tip { opacity:1; transform:translateX(-50%) translateY(0); }
+  /* на мобильных hover не нужен — открываем только по клику */
+  @media (hover:none) { .hint:hover .tip { opacity:0; transform:translateX(-50%) translateY(4px); } .hint.open .tip { opacity:1; transform:translateX(-50%) translateY(0); } }
 
   /* ===== Музыка ===== */
   #music, #trackLink { position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px));
@@ -103,8 +128,7 @@ const SUPABASE_KEY = "sb_publishable_lT94AQ-q-57M620LTo3NYQ_2zXO53GO";
 const PHOTO_BUCKET = "player-photos";
 const MUSIC_BUCKET = "player-music";
 
-// ← имя параметра сезона в RPC. Если у вас p_season — поменяйте здесь.
-const SEASON_PARAM = "p_year";
+const SEASON_PARAM = "p_year"; // ← имя параметра сезона в RPC
 
 const H = { apikey: SUPABASE_KEY, "Content-Type": "application/json" };
 const REST = SUPABASE_URL + "/rest/v1/";
@@ -119,7 +143,6 @@ async function api(path, opts) {
 }
 const getPlayers = () => api("players?select=id,name&order=name");
 
-// ===== Сезоны из таблицы tours (distinct по tour_year) =====
 async function getSeasons() {
   const rows = await api("tours?select=tour_year&order=tour_year.desc");
   const set = new Set();
@@ -127,7 +150,6 @@ async function getSeasons() {
   return [...set];
 }
 
-// ===== Статистика с учётом сезона =====
 async function getStats(id, year) {
   const body = { p_player_id: id };
   if (year != null && year !== "") body[SEASON_PARAM] = year;
@@ -137,7 +159,6 @@ async function getStats(id, year) {
 
 const getMusicLink = async id => (await api(`players?select=music_track_link&id=eq.${id}`))[0]?.music_track_link || null;
 
-// максимумы по всем игрокам — для длины полосок
 let MAX = {};
 async function loadMax() {
   try {
@@ -149,18 +170,57 @@ async function loadMax() {
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
+// ====== ТЕКСТЫ ПОДСКАЗОК ======
+const TIPS = {
+  points:      "1 место — 3 очка, 2 место — 2 очка, 3 место — 0 очков.",
+  goalAssists: "Г+П — голы + передачи.",
+  avg:         "Ср. — среднее за тур.",
+  value:       "Ценность — показатель продуктивности (0.6 × ср. очки за тур + 0.4 × ср. Г+П за тур).",
+  attendance:  "Посещение — доля сыгранных туров.",
+  rating:      "Рейтинг — ценность с учётом посещения."
+};
+
+// Кружок «?» с подсказкой. Возвращает элемент .hint
+function hint(key) {
+  const wrap = el("span", "hint");
+  const b = el("button"); b.type = "button"; b.textContent = "?"; b.setAttribute("aria-label", "Подсказка");
+  const tip = el("span", "tip", TIPS[key] || "");
+  wrap.append(b, tip);
+  b.addEventListener("click", e => {
+    e.stopPropagation();
+    const wasOpen = wrap.classList.contains("open");
+    document.querySelectorAll(".hint.open").forEach(x => x.classList.remove("open"));
+    if (!wasOpen) wrap.classList.add("open");
+  });
+  return wrap;
+}
+
 function fitName(box, nm) {
   let f = 1.7; nm.style.fontSize = f + "em";
   while (nm.offsetWidth > box.clientWidth && f > 0.8) { f -= 0.05; nm.style.fontSize = f + "em"; }
 }
 
-function tile(label, value, max, suffix) {
+// label с опциональным кружком
+function labelWithHint(text, key) {
+  const d = el("div", "tl"); d.append(el("span", null, text));
+  if (key) d.append(hint(key));
+  return d;
+}
+
+function tile(label, value, max, suffix, key) {
   const t = el("div", "tile"), row = el("div", "trow");
   const tv = el("div", "tv", fmt(value, 2)); if (suffix) tv.append(el("small", null, suffix));
-  row.append(el("div", "tl", label), tv);
+  row.append(labelWithHint(label, key), tv);
   const bar = el("div", "bar"), i = el("i");
   i.style.width = (max > 0 ? Math.min(100, (Number(value) || 0) / max * 100) : 0) + "%";
   bar.append(i); t.append(row, bar); return t;
+}
+
+function totalCell(labelText, value, key) {
+  const d = el("div"); d.append(el("b", null, typeof value === "string" ? value : fmt(value)));
+  const s = el("span"); s.append(el("span", null, labelText));
+  if (key) s.append(hint(key));
+  d.append(s); return d;
 }
 
 function render(s, yearForLabel) {
@@ -184,7 +244,6 @@ function render(s, yearForLabel) {
 
   const box = el("div", "namebox"), nm = el("span", "nm", s.player_name); box.append(nm);
 
-  // ===== Сезон под именем: берём year из ответа, иначе — выбранный в селекте =====
   const season = (s.year != null && s.year !== "") ? String(s.year) : (yearForLabel ? String(yearForLabel) : null);
   if (season) card.append(top, box, el("div", "season", "Сезон " + season));
   else card.append(top, box);
@@ -197,25 +256,41 @@ function render(s, yearForLabel) {
 
   // --- боковая панель ---
   const side = el("div", "side");
-  const avg = el("div", "panel"); avg.append(el("div", "ptitle", "В среднем за тур"));
-  avg.append(
-    tile("Очки", s.avg_points_per_tour, MAX.avg_points_per_tour),
+
+  const avg = el("div", "panel");
+  const avgTitle = el("div", "ptitle"); avgTitle.append(el("span", null, "В среднем за тур"), hint("avg"));
+  avg.append(avgTitle,
+    tile("Очки", s.avg_points_per_tour, MAX.avg_points_per_tour, null, "points"),
     tile("Голы", s.avg_goals_per_tour, MAX.avg_goals_per_tour),
     tile("Пасы", s.avg_assists_per_tour, MAX.avg_assists_per_tour),
-    tile("Г+П", s.avg_goal_assists_per_tour, MAX.avg_goal_assists_per_tour));
-  const att = el("div", "panel"); att.append(el("div", "ptitle", "Активность"));
-  att.append(tile("Посещаемость", s.attendance_pct, 100, "%"), tile("Ценность", s.productivity_value, Math.max(3, Number(s.productivity_value) || 0)));
+    tile("Г+П",  s.avg_goal_assists_per_tour, MAX.avg_goal_assists_per_tour, null, "goalAssists"));
+
+  const att = el("div", "panel"); att.append(el("div", "ptitle", "Оценка"));
+  att.append(
+    tile("Ценность", s.productivity_value, Math.max(3, Number(s.productivity_value) || 0), null, "value"),
+    tile("Рейтинг",  s.rating, 10, null, "rating"));
+
   const tot = el("div", "panel"); tot.append(el("div", "ptitle", "Всего"));
   const g = el("div", "totals");
-  [["ТУРЫ", s.played_tours], ["ОЧКИ", s.points], ["ГОЛЫ", s.goals], ["ПАСЫ", s.assists], ["Г+П", s.goal_assists], ["РЕЙТИНГ", fmt(s.rating, 2)]]
-    .forEach(([l, v]) => { const d = el("div"); d.append(el("b", null, typeof v === "string" ? v : fmt(v)), el("span", null, l)); g.append(d); });
+  g.append(
+    totalCell("ГОЛЫ", s.goals),
+    totalCell("ПАСЫ", s.assists),
+    totalCell("Г+П",  s.goal_assists, "goalAssists"),
+    totalCell("ТУРЫ", s.played_tours),
+    totalCell("ОЧКИ", s.points, "points"),
+    totalCell("ПОСЕЩЕНИЕ", s.attendance_pct == null ? null : fmt(s.attendance_pct, 0) + "%", "attendance"));
   tot.append(g);
+
   side.append(avg, att, tot);
 
   root.append(card, side);
   fitName(box, nm);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitName(box, nm));
 }
+
+// закрываем подсказки по клику вне
+document.addEventListener("click", () => document.querySelectorAll(".hint.open").forEach(x => x.classList.remove("open")));
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".hint.open").forEach(x => x.classList.remove("open")); });
 
 // ====== МУЗЫКА ======
 const audio = new Audio(); audio.loop = true;
@@ -247,9 +322,7 @@ const seasonPicker = document.getElementById("seasonPicker");
 const REFRESH_MS = 10000;
 let lastSig = "", curMusic;
 
-function currentSelection() {
-  return { id: picker.value, year: seasonPicker.value };
-}
+function currentSelection() { return { id: picker.value, year: seasonPicker.value }; }
 
 async function show() {
   const { id, year } = currentSelection();
@@ -283,13 +356,9 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
   try {
     const [players, seasons] = await Promise.all([getPlayers(), getSeasons(), loadMax()]);
 
-    // игроки
     players.forEach(p => { const o = el("option", null, p.name); o.value = p.id; picker.append(o); });
-
-    // сезоны (по убыванию). Первый — самый свежий по умолчанию.
     seasons.forEach(y => { const o = el("option", null, y); o.value = y; seasonPicker.append(o); });
 
-    // из URL можно задать ?id=...&year=...
     const qs = new URLSearchParams(location.search);
     const qid = qs.get("id"), qyear = qs.get("year");
     if (qid) picker.value = qid;
