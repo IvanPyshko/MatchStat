@@ -14,7 +14,19 @@
     background: radial-gradient(circle at 50% 20%, #1f3a5f, #0b1320 75%) fixed;
     font-family:'Oswald','Arial Narrow',Impact,sans-serif; color:#fff;
   }
-  select { font:inherit; padding:9px 12px; border-radius:10px; border:0; background:#e9eef6; width:min(100%,360px); }
+  /* ===== Заголовок лиги ===== */
+  .league-title {
+    margin:0; text-align:center; font-size:clamp(20px, 5.5vw, 34px); font-weight:700;
+    letter-spacing:3px; text-transform:uppercase; line-height:1.1;
+    color:var(--gold1);
+    text-shadow:0 2px 0 var(--gold3), 0 6px 18px rgba(0,0,0,.55);
+  }
+  /* ===== Панель выбора: игрок + сезон ===== */
+  .controls {
+    display:flex; flex-wrap:wrap; justify-content:center; align-items:center;
+    gap:10px; width:100%;
+  }
+  select { font:inherit; padding:9px 12px; border-radius:10px; border:0; background:#e9eef6; width:min(100%,260px); }
   .wrap { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:28px; width:100%; }
 
   /* ===== Карточка: всё в em, размер задаётся font-size ===== */
@@ -36,10 +48,13 @@
   .photo { position:absolute; right:-.25em; bottom:0; width:11.9em; height:11.9em; display:flex; align-items:flex-end; justify-content:center; }
   .photo img { max-width:100%; max-height:100%; object-fit:contain; object-position:bottom; }
   .ph { font-size:5.6em; opacity:.35; }
-  /* имя: фиксированная высота, одна строка, шрифт подгоняется под ширину */
   .namebox { height:2.4em; margin-top:.4em; display:flex; align-items:center; justify-content:center; overflow:hidden;
     border-bottom:2px solid rgba(58,42,8,.45); }
   .nm { display:inline-block; white-space:nowrap; font-size:1.7em; font-weight:700; text-transform:uppercase; letter-spacing:1px; line-height:1.1; }
+  .season {
+    margin-top:.55em; text-align:center; font-size:.8em; font-weight:600;
+    letter-spacing:2px; text-transform:uppercase; color:var(--ink); opacity:.8;
+  }
   .stats { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(3,auto); grid-auto-flow:column; gap:.4em .6em; padding:.9em .4em 0; }
   .stat { display:flex; align-items:baseline; gap:.4em; font-size:1.4em; font-weight:700; white-space:nowrap; }
   .stat span { font-size:.6em; font-weight:400; letter-spacing:.5px; }
@@ -72,7 +87,11 @@
 </style>
 </head>
 <body>
-  <select id="picker" aria-label="Игрок"></select>
+  <h1 class="league-title">Лига Пивных Животов</h1>
+  <div class="controls">
+    <select id="picker" aria-label="Игрок"></select>
+    <select id="seasonPicker" aria-label="Сезон"></select>
+  </div>
   <div class="wrap" id="root"></div>
   <button id="music" hidden aria-label="Музыка">♪</button>
   <a id="trackLink" hidden target="_blank" rel="noopener">♪ Трек</a>
@@ -83,6 +102,9 @@ const SUPABASE_URL = "https://jndrxhmlgamzlqcfpqun.supabase.co";
 const SUPABASE_KEY = "sb_publishable_lT94AQ-q-57M620LTo3NYQ_2zXO53GO";
 const PHOTO_BUCKET = "player-photos";
 const MUSIC_BUCKET = "player-music";
+
+// ← имя параметра сезона в RPC. Если у вас p_season — поменяйте здесь.
+const SEASON_PARAM = "p_year";
 
 const H = { apikey: SUPABASE_KEY, "Content-Type": "application/json" };
 const REST = SUPABASE_URL + "/rest/v1/";
@@ -96,7 +118,23 @@ async function api(path, opts) {
   return r.json();
 }
 const getPlayers = () => api("players?select=id,name&order=name");
-const getStats = async id => (await api("rpc/get_player_overall_stats", { method: "POST", body: JSON.stringify({ p_player_id: id }) }))[0];
+
+// ===== Сезоны из таблицы tours (distinct по tour_year) =====
+async function getSeasons() {
+  const rows = await api("tours?select=tour_year&order=tour_year.desc");
+  const set = new Set();
+  for (const r of rows) if (r.tour_year != null && r.tour_year !== "") set.add(String(r.tour_year));
+  return [...set];
+}
+
+// ===== Статистика с учётом сезона =====
+async function getStats(id, year) {
+  const body = { p_player_id: id };
+  if (year != null && year !== "") body[SEASON_PARAM] = year;
+  const rows = await api("rpc/get_player_overall_stats", { method: "POST", body: JSON.stringify(body) });
+  return rows[0];
+}
+
 const getMusicLink = async id => (await api(`players?select=music_track_link&id=eq.${id}`))[0]?.music_track_link || null;
 
 // максимумы по всем игрокам — для длины полосок
@@ -125,10 +163,10 @@ function tile(label, value, max, suffix) {
   bar.append(i); t.append(row, bar); return t;
 }
 
-function render(s) {
+function render(s, yearForLabel) {
   const root = document.getElementById("root");
   root.replaceChildren();
-  if (!s) { root.append(el("p", "err", "Нет данных по этому игроку")); return; }
+  if (!s) { root.append(el("p", "err", "Нет данных по этому игроку за выбранный сезон")); return; }
 
   // --- карточка ---
   const card = el("div", "card"), top = el("div", "top"), left = el("div", "left");
@@ -146,11 +184,16 @@ function render(s) {
 
   const box = el("div", "namebox"), nm = el("span", "nm", s.player_name); box.append(nm);
 
+  // ===== Сезон под именем: берём year из ответа, иначе — выбранный в селекте =====
+  const season = (s.year != null && s.year !== "") ? String(s.year) : (yearForLabel ? String(yearForLabel) : null);
+  if (season) card.append(top, box, el("div", "season", "Сезон " + season));
+  else card.append(top, box);
+
   const stats = el("div", "stats");
   [["ГОЛЫ", s.goals], ["ПАСЫ", s.assists], ["Г+П", s.goal_assists],
    ["ТУРЫ", s.played_tours], ["ОЧКИ", s.points], ["ПОСЕЩЕНИЕ", s.attendance_pct == null ? null : fmt(s.attendance_pct, 0) + "%"]]
     .forEach(([label, v]) => { const r = el("div", "stat", typeof v === "string" ? v : fmt(v)); r.append(el("span", null, label)); stats.append(r); });
-  card.append(top, box, stats);
+  card.append(stats);
 
   // --- боковая панель ---
   const side = el("div", "side");
@@ -183,7 +226,6 @@ audio.onplay = audio.onpause = sync;
 audio.onerror = () => { hasTrack = false; btn.hidden = true; };
 function tryPlay() { if (hasTrack && !userPaused) audio.play().catch(() => {}); }
 btn.onclick = () => { if (audio.paused) { userPaused = false; audio.play().catch(() => {}); } else { userPaused = true; audio.pause(); } };
-// браузеры запрещают автозапуск со звуком — стартуем при первом касании или клике
 ["pointerdown", "keydown"].forEach(ev => addEventListener(ev, e => {
   if (e.target.closest && e.target.closest("#music")) return;
   if (audio.paused) tryPlay();
@@ -193,38 +235,45 @@ function setMusic(v) {
   audio.pause(); hasTrack = false; btn.hidden = true; link.hidden = true;
   if (!v) return;
   if (isUrl(v) && !/\.(mp3|m4a|aac|ogg|wav|webm)(\?|$)/i.test(v) && !v.includes("/storage/v1/object/")) {
-    link.href = v; link.hidden = false; return; // не аудиофайл (YouTube, Spotify…) — просто ссылка
+    link.href = v; link.hidden = false; return;
   }
   audio.src = isUrl(v) ? v : pub(MUSIC_BUCKET, v);
   hasTrack = true; btn.hidden = false; sync(); tryPlay();
 }
 
+// ====== УПРАВЛЕНИЕ ======
 const picker = document.getElementById("picker");
-const REFRESH_MS = 10000; // как часто проверять новые данные
+const seasonPicker = document.getElementById("seasonPicker");
+const REFRESH_MS = 10000;
 let lastSig = "", curMusic;
 
-async function show(id) {
+function currentSelection() {
+  return { id: picker.value, year: seasonPicker.value };
+}
+
+async function show() {
+  const { id, year } = currentSelection();
+  if (!id) return;
   try {
-    const s = await getStats(id);
-    lastSig = JSON.stringify([s, MAX]); render(s);
+    const s = await getStats(id, year);
+    lastSig = JSON.stringify([s, MAX, year]); render(s, year);
     getMusicLink(id).then(m => { if (id === picker.value) { curMusic = m; setMusic(m); } })
                     .catch(() => { curMusic = null; setMusic(null); });
   } catch (e) { document.getElementById("root").replaceChildren(el("p", "err", e.message)); }
 }
 
-// тихое автообновление: перерисовываем только если данные изменились
 let busy = false;
 async function refresh() {
   if (busy || document.hidden || !picker.value) return;
   busy = true;
-  const id = picker.value;
+  const { id, year } = currentSelection();
   try {
-    const [s] = await Promise.all([getStats(id), loadMax()]);
-    const sig = JSON.stringify([s, MAX]);
-    if (id === picker.value && sig !== lastSig) { lastSig = sig; render(s); }
+    const [s] = await Promise.all([getStats(id, year), loadMax()]);
+    const sig = JSON.stringify([s, MAX, year]);
+    if (id === picker.value && seasonPicker.value === year && sig !== lastSig) { lastSig = sig; render(s, year); }
     const m = await getMusicLink(id);
     if (id === picker.value && m !== curMusic) { curMusic = m; setMusic(m); }
-  } catch (e) { /* нет сети — оставляем старые данные, попробуем в следующий раз */ }
+  } catch (e) { /* нет сети — оставим старые данные */ }
   finally { busy = false; }
 }
 setInterval(refresh, REFRESH_MS);
@@ -232,12 +281,24 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 
 (async () => {
   try {
-    const [players] = await Promise.all([getPlayers(), loadMax()]);
+    const [players, seasons] = await Promise.all([getPlayers(), getSeasons(), loadMax()]);
+
+    // игроки
     players.forEach(p => { const o = el("option", null, p.name); o.value = p.id; picker.append(o); });
-    const fromUrl = new URLSearchParams(location.search).get("id");
-    if (fromUrl) picker.value = fromUrl;
-    picker.onchange = () => show(picker.value);
-    if (players.length) show(picker.value);
+
+    // сезоны (по убыванию). Первый — самый свежий по умолчанию.
+    seasons.forEach(y => { const o = el("option", null, y); o.value = y; seasonPicker.append(o); });
+
+    // из URL можно задать ?id=...&year=...
+    const qs = new URLSearchParams(location.search);
+    const qid = qs.get("id"), qyear = qs.get("year");
+    if (qid) picker.value = qid;
+    if (qyear && seasons.includes(qyear)) seasonPicker.value = qyear;
+
+    picker.onchange = show;
+    seasonPicker.onchange = show;
+
+    if (players.length && seasons.length) show();
   } catch (e) { document.getElementById("root").append(el("p", "err", e.message)); }
 })();
 </script>
