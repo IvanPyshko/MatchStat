@@ -57,7 +57,7 @@ const P=id=>(S.players.find(p=>p.id===id)||{name:"?"}).name;
 const T=id=>S.teams.find(t=>t.id===id);
 const mine=tid=>S.players.filter(p=>S.squad[p.id]===tid).sort(byName);
 const score=(m,tid)=>S.goals.filter(g=>g.match_id===m.id&&g.team_id===tid).length;
-const top=(title,back)=>el("div",{class:"top"},back?el("button",{class:"b",onclick:back},"←"):null,el("h1",{},title));
+const topbar=(title,back)=>el("div",{class:"top"},back?el("button",{class:"b",onclick:back},"←"):null,el("h1",{},title));
 const draw=()=>({home,tour:tourView,match:matchView})[S.view]();
 const loadTours=async()=>{S.tours=await get("tours?select=id,tour_year,tour_number,played_on&order=played_on.desc")};
 
@@ -77,7 +77,7 @@ addEventListener("online",pump);
 // ===== главный экран =====
 function home(){
   const d=el("input",{type:"date",value:new Date().toISOString().slice(0,10)});
-  $.replaceChildren(top("MatchStat · ввод"),
+  $.replaceChildren(topbar("MatchStat · ввод"),
     el("div",{class:"hint"},`${S.me.name} · ${S.me.role==="owner"?"владелец":"админ"}`),
     el("div",{class:"row"},d,el("button",{class:"b p",onclick:async()=>{try{await call("create_tour",{p_played_on:d.value});await loadTours();open(S.tours.find(t=>t.played_on===d.value))}catch(e){say(e.message)}}},"+ Тур")),
     ...S.tours.map(t=>el("div",{class:"row",onclick:()=>open(t)},el("div",{class:"n"},`Тур ${t.tour_number}/${t.tour_year}`),el("span",{class:"hint"},t.played_on))),
@@ -96,7 +96,7 @@ async function open(t){
 function tourView(){
   const t=S.tour;
   const tabs=el("div",{class:"tabs"},...[["matches","Матчи"],["squad","Состав"]].map(([k,l])=>el("button",{class:"b"+(S.tab===k?" on":""),onclick:()=>{S.tab=k;draw()}},l)));
-  $.replaceChildren(top(`Тур ${t.tour_number} · ${t.played_on}`,()=>{S.view="home";draw()}),tabs,S.tab==="squad"?squadTab():matchesTab())}
+  $.replaceChildren(topbar(`Тур ${t.tour_number} · ${t.played_on}`,()=>{S.view="home";draw()}),tabs,S.tab==="squad"?squadTab():matchesTab())}
 
 function squadTab(){
   const d=el("div"),cnt=el("div",{class:"hint",style:"margin:8px 0"}),list=el("div");
@@ -135,7 +135,7 @@ function matchView(){
   const m=S.match,H=T(m.home_team_id),A=T(m.away_team_id);
   const col=t=>el("div",{},el("div",{class:"hint",style:`color:${t.color}`},t.name),...mine(t.id).map(p=>el("button",{class:"pl",style:`background:${t.color}`,onclick:()=>pickAssist(t,p)},p.name)));
   const gl=S.goals.filter(g=>g.match_id===m.id).slice().reverse();
-  $.replaceChildren(top("Матч",()=>{if(Q.length)return say("Ещё отправляются данные…");S.view="tour";S.tab="matches";draw()}),
+  $.replaceChildren(topbar("Матч",()=>{if(Q.length)return say("Ещё отправляются данные…");S.view="tour";S.tab="matches";draw()}),
     el("div",{class:"score"},el("span",{style:`color:${H.color}`},score(m,H.id))," : ",el("span",{style:`color:${A.color}`},score(m,A.id))),
     el("div",{class:"hint"},"Нажмите на автора гола"),el("div",{class:"cols"},col(H),col(A)),
     el("div",{class:"hint",style:"margin-top:14px"},"Голы (последние сверху)"),
@@ -160,7 +160,7 @@ function delGoal(g){ask("Удалить гол?",()=>{S.goals=S.goals.filter(x=>
 async function adminsView(){
   try{const a=await call("list_admins");
     const id=el("input",{placeholder:"Telegram-id",inputmode:"numeric"}),nm=el("input",{placeholder:"Имя"});
-    $.replaceChildren(top("Админы",()=>{S.view="home";draw()}),
+    $.replaceChildren(topbar("Админы",()=>{S.view="home";draw()}),
       ...a.map(x=>el("div",{class:"row"},el("div",{class:"n"},`${x.display_name} `,el("span",{class:"hint"},`${x.telegram_id} · ${x.role}${x.is_active?"":" · отключён"}`)),
         x.telegram_id===S.me.id?null:el("button",{class:"b",onclick:async()=>{try{await call("set_admin_active",{p_target:x.telegram_id,p_active:!x.is_active});adminsView()}catch(e){say(e.message)}}},x.is_active?"Отключить":"Включить"))),
       el("div",{class:"hint",style:"margin-top:14px"},"Новый админ"),id,nm,
