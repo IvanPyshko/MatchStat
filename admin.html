@@ -29,6 +29,10 @@ input,select{font:16px system-ui;padding:10px;border-radius:10px;border:1px soli
 #pend{position:fixed;top:8px;right:10px;z-index:30;background:#d97706;color:#fff;border-radius:10px;padding:4px 8px;font-size:13px}
 .tabs{display:flex;gap:8px}.tabs .b{flex:1}.tabs .on{background:var(--acc);color:var(--accfg)}
 .wide{width:100%;margin-top:8px}
+.readonly{opacity:.85}
+.badge{display:inline-block;font-size:11px;border-radius:6px;padding:1px 6px;margin-left:6px;background:#0004}
+/* подсветка цвета в списке голов */
+.goal-row{border-left:6px solid transparent}
 </style>
 </head>
 <body>
@@ -37,14 +41,13 @@ input,select{font:16px system-ui;padding:10px;border-radius:10px;border:1px soli
 <script>
 const SB="https://jndrxhmlgamzlqcfpqun.supabase.co",KEY="sb_publishable_lT94AQ-q-57M620LTo3NYQ_2zXO53GO";
 const tg=window.Telegram&&Telegram.WebApp; if(tg){tg.ready();tg.expand()}
-const LK=new URLSearchParams(location.search).get("k")||""; // ключ запуска из кнопки клавиатуры бота
+const LK=new URLSearchParams(location.search).get("k")||"";
 const $=document.getElementById("app"), sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const buzz=()=>{try{tg.HapticFeedback.impactOccurred("light")}catch(e){}};
 const say=m=>tg&&tg.showAlert?tg.showAlert(m):alert(m);
 const ask=(m,cb)=>tg&&tg.showConfirm?tg.showConfirm(m,ok=>ok&&cb()):confirm(m)&&cb();
 const el=(t,p={},...k)=>{const e=document.createElement(t);for(const[a,v]of Object.entries(p)){if(a==="class")e.className=v;else if(a==="style")e.style.cssText=v;else if(a.startsWith("on"))e[a]=v;else e.setAttribute(a,v)}e.append(...k.flat().filter(x=>x!=null&&x!==false));return e};
 
-// чтение — публичный ключ (только SELECT); запись — только через Edge Function с проверкой Telegram
 const get=async q=>{const r=await fetch(`${SB}/rest/v1/${q}`,{headers:{apikey:KEY}});if(!r.ok)throw new Error("Ошибка загрузки ("+r.status+")");return r.json()};
 const call=async(action,params={})=>{
   const r=await fetch(`${SB}/functions/v1/admin-api`,{method:"POST",headers:{"Content-Type":"application/json",apikey:KEY},body:JSON.stringify({initData:(tg&&tg.initData)||"",launchKey:LK,action,params})});
@@ -52,17 +55,23 @@ const call=async(action,params={})=>{
   if(!j.ok){const e=new Error(j.error);e.status=r.status;throw e}
   return j.data};
 
-const S={view:"home",tab:"matches",me:null,players:[],teams:[],tours:[],tour:null,squad:{},matches:[],goals:[],match:null,q:""};
+const S={view:"home",tab:"matches",me:null,players:[],teams:[],tours:[],tour:null,squad:{},matches:[],goals:[],match:null,q:"",lastTourId:null};
 const byName=(a,b)=>a.name.localeCompare(b.name,"ru");
 const P=id=>(S.players.find(p=>p.id===id)||{name:"?"}).name;
 const T=id=>S.teams.find(t=>t.id===id);
 const mine=tid=>S.players.filter(p=>S.squad[p.id]===tid).sort(byName);
 const score=(m,tid)=>S.goals.filter(g=>g.match_id===m.id&&g.team_id===tid).length;
+// последний тур — редактируемый
+const isEditable=t=>!t?!1:t.id===S.lastTourId;
+
 const topbar=(title,back)=>el("div",{class:"top"},back?el("button",{class:"b",onclick:back},"←"):null,el("h1",{},title));
 const draw=()=>({home,tour:tourView,match:matchView})[S.view]();
-const loadTours=async()=>{S.tours=await get("tours?select=id,tour_year,tour_number,played_on&order=played_on.desc")};
+const loadTours=async()=>{
+  S.tours=await get("tours?select=id,tour_year,tour_number,played_on&order=played_on.desc");
+  S.lastTourId=S.tours.length?S.tours[0].id:null;
+};
 
-// ===== очередь отправки: ввод мгновенный, запись в фоне с повторами при плохой связи =====
+// очередь
 const Q=[];let busy=false;
 const pend=()=>{const p=document.getElementById("pend");p.hidden=!Q.length;p.textContent="⏳ не отправлено: "+Q.length};
 function enqueue(action,params){Q.push({action,params});pend();pump()}
@@ -81,7 +90,9 @@ function home(){
   $.replaceChildren(topbar("MatchStat · ввод"),
     el("div",{class:"hint"},`${S.me.name} · ${S.me.role==="owner"?"владелец":"админ"}`),
     el("div",{class:"row"},d,el("button",{class:"b p",onclick:async()=>{try{await call("create_tour",{p_played_on:d.value});await loadTours();open(S.tours.find(t=>t.played_on===d.value))}catch(e){say(e.message)}}},"+ Тур")),
-    ...S.tours.map(t=>el("div",{class:"row",onclick:()=>open(t)},el("div",{class:"n"},`Тур ${t.tour_number}/${t.tour_year}`),el("span",{class:"hint"},t.played_on))),
+    ...S.tours.map(t=>el("div",{class:"row",onclick:()=>open(t)},
+      el("div",{class:"n"},`Тур ${t.tour_number}/${t.tour_year}`, isEditable(t)?el("span",{class:"badge",style:"background:var(--acc);color:var(--accfg)"},"текущий"):el("span",{class:"badge"},"архив")),
+      el("span",{class:"hint"},t.played_on))),
     S.me.role==="owner"?el("button",{class:"b wide",onclick:adminsView},"Админы"):null)}
 
 async function open(t){
@@ -95,54 +106,95 @@ async function open(t){
 
 // ===== тур: составы и матчи =====
 function tourView(){
-  const t=S.tour;
+  const t=S.tour, editable=isEditable(t);
   const tabs=el("div",{class:"tabs"},...[["matches","Матчи"],["squad","Состав"]].map(([k,l])=>el("button",{class:"b"+(S.tab===k?" on":""),onclick:()=>{S.tab=k;draw()}},l)));
-  $.replaceChildren(topbar(`Тур ${t.tour_number} · ${t.played_on}`,()=>{S.view="home";draw()}),tabs,S.tab==="squad"?squadTab():matchesTab())}
+  $.replaceChildren(topbar(`Тур ${t.tour_number} · ${t.played_on}${editable?" · текущий":" · архив"}`,()=>{S.view="home";draw()}),tabs,S.tab==="squad"?squadTab(editable):matchesTab(editable))}
 
-function squadTab(){
+function squadTab(editable){
   const d=el("div"),cnt=el("div",{class:"hint",style:"margin:8px 0"}),list=el("div");
-  const q=el("input",{placeholder:"Поиск игрока",value:S.q,oninput:e=>{S.q=e.target.value;rows()}});
+  // только те, кто уже в составе, сортировка по цвету команды → по имени
   const rows=()=>{
     cnt.textContent=S.teams.map(t=>`${t.name}: ${Object.values(S.squad).filter(x=>x===t.id).length}`).join(" · ");
-    list.replaceChildren(...S.players.filter(p=>(p.is_active||S.squad[p.id])&&p.name.toLowerCase().includes(S.q.toLowerCase())).map(p=>
-      el("div",{class:"row"},el("div",{class:"n"},p.name),...S.teams.map(t=>el("button",{class:"dot"+(S.squad[p.id]===t.id?" on":""),style:`background:${t.color}`,
-        onclick:()=>{if(S.squad[p.id]===t.id)delete S.squad[p.id];else S.squad[p.id]=t.id;buzz();rows()}})))))};
+    const arr=Object.entries(S.squad).map(([pid,tid])=>({pid,tid,team:T(tid),p:S.players.find(p=>p.id===pid)})).filter(x=>x.p);
+    arr.sort((a,b)=>(a.team.code.localeCompare(b.team.code))||byName(a.p,b.p));
+    list.replaceChildren(...arr.map(({pid,tid,team,p})=>el("div",{class:"row goal-row",style:`border-left-color:${team.color}`},
+      el("div",{class:"n"},p.name),
+      el("span",{class:"badge",style:`background:${team.color}`},team.name),
+      editable?el("button",{class:"b",onclick:()=>{ask(`Убрать ${p.name} из состава?`,()=>{delete S.squad[pid];saveSquad()})}},"Убрать"):null)));
+  };
   rows();
-  d.append(q,cnt,list,el("div",{class:"bar"},el("button",{class:"b p",onclick:saveSquad},"Сохранить состав")));
-  return d}
+  d.append(cnt,list);
+  if(editable)d.append(el("div",{class:"bar"},el("button",{class:"b p",onclick:()=>pickPlayerToSquad()},'+ Добавить в состав')));
+  return d;
+}
+function pickPlayerToSquad(){
+  const close=()=>sh.remove();
+  const sh=el("div",{class:"sheet",onclick:close},el("div",{onclick:e=>e.stopPropagation()},
+    el("div",{class:"hint"},"Кого добавить в состав?"),
+    ...S.players.filter(p=>!S.squad[p.id]).sort(byName).map(p=>el("button",{class:"pl",style:"background:#334155",onclick:()=>{close();chooseTeam(p)}},p.name)),
+    el("button",{class:"b wide",onclick:close},"Отмена")));
+  document.body.append(sh)}
+function chooseTeam(p){
+  const close=()=>sh.remove();
+  const sh=el("div",{class:"sheet",onclick:close},el("div",{onclick:e=>e.stopPropagation()},
+    el("div",{class:"hint"},`Команда для ${p.name}`),
+    ...S.teams.map(t=>el("button",{class:"pl",style:`background:${t.color}`,onclick:()=>{close();S.squad[p.id]=t.id;saveSquad()}},t.name)),
+    el("button",{class:"b wide",onclick:close},"Отмена")));
+  document.body.append(sh)}
 async function saveSquad(){
-  try{await call("set_squad",{p_tour:S.tour.id,p_assignments:Object.entries(S.squad).map(([player_id,team_id])=>({player_id,team_id}))});say("Состав сохранён")}
+  try{await call("set_squad",{p_tour:S.tour.id,p_assignments:Object.entries(S.squad).map(([player_id,team_id])=>({player_id,team_id}))});say("Состав сохранён");if(S.view==="tour")draw()}
   catch(e){say(e.message.replace("player_has_activity:","У игрока уже есть голы/пасы в этом туре:"))}}
 
-function matchesTab(){
+function matchesTab(editable){
   const d=el("div");
-  d.append(...S.matches.map(m=>{const h=T(m.home_team_id),a=T(m.away_team_id);
+  // список матчей: голы подсвечиваем цветом команды, вратарей показываем с "В"
+  d.append(...S.matches.map(m=>{
+    const h=T(m.home_team_id),a=T(m.away_team_id);
+    const goals=S.goals.filter(g=>g.match_id===m.id);
     return el("div",{class:"row",onclick:()=>{S.match=m;S.view="match";draw()}},
-      el("div",{class:"n"},el("b",{style:`color:${h.color}`},h.name)," ",`${score(m,h.id)} : ${score(m,a.id)}`," ",el("b",{style:`color:${a.color}`},a.name)),
-      el("button",{class:"b",onclick:e=>{e.stopPropagation();ask("Удалить матч и все его голы?",async()=>{try{await call("delete_match",{p_match:m.id});await open(S.tour)}catch(x){say(x.message)}})}},"🗑"))}));
-  const opts=()=>S.teams.map(t=>el("option",{value:t.id},t.name));
-  const hT=el("select",{},...opts()),aT=el("select",{},...opts());aT.selectedIndex=1;
-  const hG=el("select"),aG=el("select");
-  const fill=()=>{for(const[sel,ts]of[[hG,hT],[aG,aT]])sel.replaceChildren(...mine(ts.value).map(p=>el("option",{value:p.id},p.name)))};
-  hT.onchange=aT.onchange=fill;fill();
-  d.append(el("div",{class:"hint",style:"margin-top:14px"},"Новый матч: команды и вратари"),el("div",{class:"cols"},hT,aT,hG,aG),
-    el("button",{class:"b p wide",onclick:async()=>{try{
-      await call("create_match",{p_tour:S.tour.id,p_home:hT.value,p_away:aT.value,p_gk_home:hG.value,p_gk_away:aG.value});
-      await open(S.tour);S.match=S.matches[S.matches.length-1];S.view="match";draw()}catch(e){say(e.message)}}},"Создать и начать"));
+      el("div",{class:"n"},
+        el("div",{class:"hint",style:"margin-bottom:6px"},
+          `${h.name} — ${a.name} · В: ${P(m.goalkeeper_home)||"?"} / ${P(m.goalkeeper_away)||"?"}`),
+        el("div",{},el("b",{style:`color:${h.color}`},h.name)," ",score(m,h.id)," : ",score(m,a.id)," ",el("b",{style:`color:${a.color}`},a.name)),
+        ...goals.map(g=>el("div",{class:"goal-row",style:`border-left-color:${T(g.team_id).color};margin-top:4px;padding-left:8px;font-size:13px;color:var(--hint)`},
+          "⚽ ",P(g.scorer_id),g.assist_id?` (пас: ${P(g.assist_id)})`:"",g.team_id===h.id?` · ${h.name}`:` · ${a.name}`))),
+      editable?el("button",{class:"b",onclick:e=>{e.stopPropagation();ask("Удалить матч и все его голы?",async()=>{try{await call("delete_match",{p_match:m.id});await open(S.tour)}catch(x){say(x.message)}})}},"🗑"):null)}));
+  if(editable){
+    const opts=()=>S.teams.map(t=>el("option",{value:t.id},t.name));
+    const hT=el("select",{},...opts()),aT=el("select",{},...opts());aT.selectedIndex=1;
+    const hG=el("select"),aG=el("select");
+    const fill=()=>{for(const[sel,ts]of[[hG,hT],[aG,aT]])sel.replaceChildren(...mine(ts.value).map(p=>el("option",{value:p.id},p.name)))};
+    hT.onchange=aT.onchange=fill;fill();
+    d.append(el("div",{class:"hint",style:"margin-top:14px"},"Новый матч: команды и вратари"),el("div",{class:"cols"},hT,aT,hG,aG),
+      el("button",{class:"b p wide",onclick:async()=>{try{
+        await call("create_match",{p_tour:S.tour.id,p_home:hT.value,p_away:aT.value,p_gk_home:hG.value,p_gk_away:aG.value});
+        await open(S.tour);S.match=S.matches[S.matches.length-1];S.view="match";draw()}catch(e){say(e.message)}}},"Создать и начать"));
+  }
   return d}
 
-// ===== матч: быстрый ввод голов =====
+// ===== матч =====
 function matchView(){
-  const m=S.match,H=T(m.home_team_id),A=T(m.away_team_id);
-  const col=t=>el("div",{},el("div",{class:"hint",style:`color:${t.color}`},t.name),...mine(t.id).map(p=>el("button",{class:"pl",style:`background:${t.color}`,onclick:()=>pickAssist(t,p)},p.name)));
+  const m=S.match,H=T(m.home_team_id),A=T(m.away_team_id),editable=isEditable(S.tour);
+  const gkH=m.goalkeeper_home,gkA=m.goalkeeper_away;
+  const col=t=>{
+    const gk=t.id===H.id?gkH:gkA;
+    return el("div",{},
+      el("div",{class:"hint",style:`color:${t.color}`},t.name,gk?` · В: ${P(gk)}`:""),
+      ...mine(t.id).map(p=>el("button",{class:"pl",style:`background:${t.color}`,onclick:()=>pickAssist(t,p)},
+        p.name, p.id===gk?" (В)":"")));
+  };
   const gl=S.goals.filter(g=>g.match_id===m.id).slice().reverse();
-  $.replaceChildren(topbar("Матч",()=>{if(Q.length)return say("Ещё отправляются данные…");S.view="tour";S.tab="matches";draw()}),
+  $.replaceChildren(topbar(`Матч · ${editable?"текущий":"архив"}`,()=>{if(Q.length)return say("Ещё отправляются данные…");S.view="tour";S.tab="matches";draw()}),
     el("div",{class:"score"},el("span",{style:`color:${H.color}`},score(m,H.id))," : ",el("span",{style:`color:${A.color}`},score(m,A.id))),
-    el("div",{class:"hint"},"Нажмите на автора гола"),el("div",{class:"cols"},col(H),col(A)),
+    el("div",{class:"hint"},editable?"Нажмите на автора гола":"Просмотр: ввод в архивном туре запрещён"),
+    el("div",{class:"cols"},col(H),col(A)),
     el("div",{class:"hint",style:"margin-top:14px"},"Голы (последние сверху)"),
-    ...gl.map(g=>el("div",{class:"row"},el("div",{class:"n"},"⚽ ",P(g.scorer_id),g.assist_id?` (пас: ${P(g.assist_id)})`:""),el("button",{class:"b",onclick:()=>delGoal(g)},"✕"))))}
+    ...gl.map(g=>el("div",{class:"row goal-row",style:`border-left-color:${T(g.team_id).color}`},
+      el("div",{class:"n"},"⚽ ",P(g.scorer_id),g.assist_id?` (пас: ${P(g.assist_id)})`:" ",el("span",{class:"badge",style:`background:${T(g.team_id).color}`},T(g.team_id).name)),
+      editable?el("button",{class:"b",onclick:()=>delGoal(g)},"✕"):null)))}
 
 function pickAssist(t,scorer){
+  if(!isEditable(S.tour))return;
   const close=()=>sh.remove();
   const sh=el("div",{class:"sheet",onclick:close},el("div",{onclick:e=>e.stopPropagation()},
     el("div",{class:"hint"},`Гол: ${scorer.name}. Кто отдал пас?`),
@@ -155,7 +207,7 @@ function addGoal(t,scorer,assist){
   const g={id:crypto.randomUUID(),match_id:S.match.id,team_id:t.id,scorer_id:scorer,assist_id:assist};
   S.goals.push(g);buzz();
   enqueue("add_goal",{p_match:g.match_id,p_team:t.id,p_scorer:scorer,p_assist:assist,p_goal_id:g.id});draw()}
-function delGoal(g){ask("Удалить гол?",()=>{S.goals=S.goals.filter(x=>x.id!==g.id);enqueue("delete_goal",{p_goal:g.id});draw()})}
+function delGoal(g){if(!isEditable(S.tour))return;ask("Удалить гол?",()=>{S.goals=S.goals.filter(x=>x.id!==g.id);enqueue("delete_goal",{p_goal:g.id});draw()})}
 
 // ===== админы (только владелец) =====
 async function adminsView(){
