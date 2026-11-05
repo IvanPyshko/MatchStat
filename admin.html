@@ -37,6 +37,7 @@ input,select{font:16px system-ui;padding:10px;border-radius:10px;border:1px soli
 <script>
 const SB="https://jndrxhmlgamzlqcfpqun.supabase.co",KEY="sb_publishable_lT94AQ-q-57M620LTo3NYQ_2zXO53GO";
 const tg=window.Telegram&&Telegram.WebApp; if(tg){tg.ready();tg.expand()}
+const LK=new URLSearchParams(location.search).get("k")||""; // ключ запуска из кнопки клавиатуры бота
 const $=document.getElementById("app"), sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const buzz=()=>{try{tg.HapticFeedback.impactOccurred("light")}catch(e){}};
 const say=m=>tg&&tg.showAlert?tg.showAlert(m):alert(m);
@@ -46,7 +47,7 @@ const el=(t,p={},...k)=>{const e=document.createElement(t);for(const[a,v]of Obje
 // чтение — публичный ключ (только SELECT); запись — только через Edge Function с проверкой Telegram
 const get=async q=>{const r=await fetch(`${SB}/rest/v1/${q}`,{headers:{apikey:KEY}});if(!r.ok)throw new Error("Ошибка загрузки ("+r.status+")");return r.json()};
 const call=async(action,params={})=>{
-  const r=await fetch(`${SB}/functions/v1/admin-api`,{method:"POST",headers:{"Content-Type":"application/json",apikey:KEY},body:JSON.stringify({initData:(tg&&tg.initData)||"",action,params})});
+  const r=await fetch(`${SB}/functions/v1/admin-api`,{method:"POST",headers:{"Content-Type":"application/json",apikey:KEY},body:JSON.stringify({initData:(tg&&tg.initData)||"",launchKey:LK,action,params})});
   const j=await r.json().catch(()=>({ok:false,error:"bad_response"}));
   if(!j.ok){const e=new Error(j.error);e.status=r.status;throw e}
   return j.data};
@@ -175,7 +176,7 @@ async function adminsView(){
     S.teams=["blue","red","green"].map(c=>teams.find(t=>t.code===c)).filter(Boolean);
     S.me=await call("whoami");await loadTours();draw()}
   catch(e){const u=tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user;
-    $.textContent=e.message==="not_admin"?`Нет доступа. Ваш Telegram-id: ${u?u.id:"?"}. Передайте его владельцу.`:e.message==="bad_auth"?"Откройте приложение через Telegram.":"Ошибка: "+e.message}
+    $.textContent=e.message==="not_admin"?`Нет доступа. Ваш Telegram-id: ${u?u.id:"?"}. Передайте его владельцу.`:e.message==="bad_auth"?(LK?"Ссылка устарела. Напишите боту /start и нажмите кнопку снова.":"Откройте приложение через Telegram."):"Ошибка: "+e.message}
 })();
 </script>
 </body>
