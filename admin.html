@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MatchStat — ввод</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:var(--tg-theme-bg-color,#0f1a2b);--fg:var(--tg-theme-text-color,#fff);--card:var(--tg-theme-secondary-bg-color,#18263d);--hint:var(--tg-theme-hint-color,#8da2c0);--acc:var(--tg-theme-button-color,#d9b44a);--accfg:var(--tg-theme-button-text-color,#2b1d02)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;padding:0 12px 96px}
+.top{position:sticky;top:0;background:var(--bg);padding:10px 0;display:flex;gap:8px;align-items:center;z-index:5}
+.top h1{font-size:18px;margin:0;flex:1}
+.b{border:0;border-radius:12px;padding:12px 14px;font:600 15px system-ui;background:var(--card);color:var(--fg)}
+.p{background:var(--acc);color:var(--accfg)}
+.row{background:var(--card);border-radius:12px;padding:12px 14px;margin:8px 0;display:flex;align-items:center;gap:8px}
+.n{flex:1}
+input,select{font:16px system-ui;padding:10px;border-radius:10px;border:1px solid #fff2;background:var(--card);color:var(--fg);width:100%;margin:4px 0}
+.dot{width:38px;height:38px;border-radius:50%;border:3px solid transparent;opacity:.35;padding:0}
+.dot.on{opacity:1;border-color:#fff}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pl{width:100%;margin:4px 0;text-align:left;border-radius:10px;padding:14px 10px;border:0;color:#fff;font:600 15px system-ui}
+.score{font-size:44px;font-weight:800;text-align:center;margin:8px 0}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg);display:flex;gap:8px}
+.bar .b{flex:1}
+.sheet{position:fixed;inset:0;background:#000a;z-index:20;display:flex;align-items:flex-end}
+.sheet>div{background:var(--bg);width:100%;max-height:80vh;overflow:auto;padding:14px;border-radius:18px 18px 0 0}
+.hint{color:var(--hint);font-size:14px}
+#pend{position:fixed;top:8px;right:10px;z-index:30;background:#d97706;color:#fff;border-radius:10px;padding:4px 8px;font-size:13px}
+.tabs{display:flex;gap:8px}.tabs .b{flex:1}.tabs .on{background:var(--acc);color:var(--accfg)}
+.wide{width:100%;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="pend" hidden></div>
+<script>
+const SB="https://jndrxhmlgamzlqcfpqun.supabase.co",KEY="sb_publishable_lT94AQ-q-57M620LTo3NYQ_2zXO53GO";
+const tg=window.Telegram&&Telegram.WebApp; if(tg){tg.ready();tg.expand()}
+const $=document.getElementById("app"), sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const buzz=()=>{try{tg.HapticFeedback.impactOccurred("light")}catch(e){}};
+const say=m=>tg&&tg.showAlert?tg.showAlert(m):alert(m);
+const ask=(m,cb)=>tg&&tg.showConfirm?tg.showConfirm(m,ok=>ok&&cb()):confirm(m)&&cb();
+const el=(t,p={},...k)=>{const e=document.createElement(t);for(const[a,v]of Object.entries(p)){if(a==="class")e.className=v;else if(a==="style")e.style.cssText=v;else if(a.startsWith("on"))e[a]=v;else e.setAttribute(a,v)}e.append(...k.flat().filter(x=>x!=null&&x!==false));return e};
+
+// чтение — публичный ключ (только SELECT); запись — только через Edge Function с проверкой Telegram
+const get=async q=>{const r=await fetch(`${SB}/rest/v1/${q}`,{headers:{apikey:KEY}});if(!r.ok)throw new Error("Ошибка загрузки ("+r.status+")");return r.json()};
+const call=async(action,params={})=>{
+  const r=await fetch(`${SB}/functions/v1/admin-api`,{method:"POST",headers:{"Content-Type":"application/json",apikey:KEY},body:JSON.stringify({initData:(tg&&tg.initData)||"",action,params})});
+  const j=await r.json().catch(()=>({ok:false,error:"bad_response"}));
+  if(!j.ok){const e=new Error(j.error);e.status=r.status;throw e}
+  return j.data};
+
+const S={view:"home",tab:"matches",me:null,players:[],teams:[],tours:[],tour:null,squad:{},matches:[],goals:[],match:null,q:""};
+const byName=(a,b)=>a.name.localeCompare(b.name,"ru");
+const P=id=>(S.players.find(p=>p.id===id)||{name:"?"}).name;
+const T=id=>S.teams.find(t=>t.id===id);
+const mine=tid=>S.players.filter(p=>S.squad[p.id]===tid).sort(byName);
+const score=(m,tid)=>S.goals.filter(g=>g.match_id===m.id&&g.team_id===tid).length;
+const top=(title,back)=>el("div",{class:"top"},back?el("button",{class:"b",onclick:back},"←"):null,el("h1",{},title));
+const draw=()=>({home,tour:tourView,match:matchView})[S.view]();
+const loadTours=async()=>{S.tours=await get("tours?select=id,tour_year,tour_number,played_on&order=played_on.desc")};
+
+// ===== очередь отправки: ввод мгновенный, запись в фоне с повторами при плохой связи =====
+const Q=[];let busy=false;
+const pend=()=>{const p=document.getElementById("pend");p.hidden=!Q.length;p.textContent="⏳ не отправлено: "+Q.length};
+function enqueue(action,params){Q.push({action,params});pend();pump()}
+async function pump(){
+  if(busy)return;busy=true;
+  while(Q.length){const op=Q[0];
+    try{await call(op.action,op.params);Q.shift()}
+    catch(e){if(e.status>=400&&e.status<500){Q.shift();say("Не сохранено: "+e.message);pend();if(S.tour)await open(S.tour)}else await sleep(3000)}
+    pend()}
+  busy=false}
+addEventListener("online",pump);
+
+// ===== главный экран =====
+function home(){
+  const d=el("input",{type:"date",value:new Date().toISOString().slice(0,10)});
+  $.replaceChildren(top("MatchStat · ввод"),
+    el("div",{class:"hint"},`${S.me.name} · ${S.me.role==="owner"?"владелец":"админ"}`),
+    el("div",{class:"row"},d,el("button",{class:"b p",onclick:async()=>{try{await call("create_tour",{p_played_on:d.value});await loadTours();open(S.tours.find(t=>t.played_on===d.value))}catch(e){say(e.message)}}},"+ Тур")),
+    ...S.tours.map(t=>el("div",{class:"row",onclick:()=>open(t)},el("div",{class:"n"},`Тур ${t.tour_number}/${t.tour_year}`),el("span",{class:"hint"},t.played_on))),
+    S.me.role==="owner"?el("button",{class:"b wide",onclick:adminsView},"Админы"):null)}
+
+async function open(t){
+  if(Q.length)return say("Ещё отправляются данные, подождите…");
+  try{S.tour=t;S.q="";
+    const [sq,ms]=await Promise.all([get(`tour_squads?tour_id=eq.${t.id}&select=player_id,team_id`),get(`matches?tour_id=eq.${t.id}&select=*&order=created_at`)]);
+    S.squad=Object.fromEntries(sq.map(r=>[r.player_id,r.team_id]));S.matches=ms;
+    S.goals=ms.length?await get(`goals?match_id=in.(${ms.map(m=>m.id).join(",")})&select=*&order=created_at`):[];
+    S.view="tour";S.tab=ms.length?"matches":"squad";draw()}
+  catch(e){say(e.message)}}
+
+// ===== тур: составы и матчи =====
+function tourView(){
+  const t=S.tour;
+  const tabs=el("div",{class:"tabs"},...[["matches","Матчи"],["squad","Состав"]].map(([k,l])=>el("button",{class:"b"+(S.tab===k?" on":""),onclick:()=>{S.tab=k;draw()}},l)));
+  $.replaceChildren(top(`Тур ${t.tour_number} · ${t.played_on}`,()=>{S.view="home";draw()}),tabs,S.tab==="squad"?squadTab():matchesTab())}
+
+function squadTab(){
+  const d=el("div"),cnt=el("div",{class:"hint",style:"margin:8px 0"}),list=el("div");
+  const q=el("input",{placeholder:"Поиск игрока",value:S.q,oninput:e=>{S.q=e.target.value;rows()}});
+  const rows=()=>{
+    cnt.textContent=S.teams.map(t=>`${t.name}: ${Object.values(S.squad).filter(x=>x===t.id).length}`).join(" · ");
+    list.replaceChildren(...S.players.filter(p=>(p.is_active||S.squad[p.id])&&p.name.toLowerCase().includes(S.q.toLowerCase())).map(p=>
+      el("div",{class:"row"},el("div",{class:"n"},p.name),...S.teams.map(t=>el("button",{class:"dot"+(S.squad[p.id]===t.id?" on":""),style:`background:${t.color}`,
+        onclick:()=>{if(S.squad[p.id]===t.id)delete S.squad[p.id];else S.squad[p.id]=t.id;buzz();rows()}})))))};
+  rows();
+  d.append(q,cnt,list,el("div",{class:"bar"},el("button",{class:"b p",onclick:saveSquad},"Сохранить состав")));
+  return d}
+async function saveSquad(){
+  try{await call("set_squad",{p_tour:S.tour.id,p_assignments:Object.entries(S.squad).map(([player_id,team_id])=>({player_id,team_id}))});say("Состав сохранён")}
+  catch(e){say(e.message.replace("player_has_activity:","У игрока уже есть голы/пасы в этом туре:"))}}
+
+function matchesTab(){
+  const d=el("div");
+  d.append(...S.matches.map(m=>{const h=T(m.home_team_id),a=T(m.away_team_id);
+    return el("div",{class:"row",onclick:()=>{S.match=m;S.view="match";draw()}},
+      el("div",{class:"n"},el("b",{style:`color:${h.color}`},h.name)," ",`${score(m,h.id)} : ${score(m,a.id)}`," ",el("b",{style:`color:${a.color}`},a.name)),
+      el("button",{class:"b",onclick:e=>{e.stopPropagation();ask("Удалить матч и все его голы?",async()=>{try{await call("delete_match",{p_match:m.id});await open(S.tour)}catch(x){say(x.message)}})}},"🗑"))}));
+  const opts=()=>S.teams.map(t=>el("option",{value:t.id},t.name));
+  const hT=el("select",{},...opts()),aT=el("select",{},...opts());aT.selectedIndex=1;
+  const hG=el("select"),aG=el("select");
+  const fill=()=>{for(const[sel,ts]of[[hG,hT],[aG,aT]])sel.replaceChildren(...mine(ts.value).map(p=>el("option",{value:p.id},p.name)))};
+  hT.onchange=aT.onchange=fill;fill();
+  d.append(el("div",{class:"hint",style:"margin-top:14px"},"Новый матч: команды и вратари"),el("div",{class:"cols"},hT,aT,hG,aG),
+    el("button",{class:"b p wide",onclick:async()=>{try{
+      await call("create_match",{p_tour:S.tour.id,p_home:hT.value,p_away:aT.value,p_gk_home:hG.value,p_gk_away:aG.value});
+      await open(S.tour);S.match=S.matches[S.matches.length-1];S.view="match";draw()}catch(e){say(e.message)}}},"Создать и начать"));
+  return d}
+
+// ===== матч: быстрый ввод голов =====
+function matchView(){
+  const m=S.match,H=T(m.home_team_id),A=T(m.away_team_id);
+  const col=t=>el("div",{},el("div",{class:"hint",style:`color:${t.color}`},t.name),...mine(t.id).map(p=>el("button",{class:"pl",style:`background:${t.color}`,onclick:()=>pickAssist(t,p)},p.name)));
+  const gl=S.goals.filter(g=>g.match_id===m.id).slice().reverse();
+  $.replaceChildren(top("Матч",()=>{if(Q.length)return say("Ещё отправляются данные…");S.view="tour";S.tab="matches";draw()}),
+    el("div",{class:"score"},el("span",{style:`color:${H.color}`},score(m,H.id))," : ",el("span",{style:`color:${A.color}`},score(m,A.id))),
+    el("div",{class:"hint"},"Нажмите на автора гола"),el("div",{class:"cols"},col(H),col(A)),
+    el("div",{class:"hint",style:"margin-top:14px"},"Голы (последние сверху)"),
+    ...gl.map(g=>el("div",{class:"row"},el("div",{class:"n"},"⚽ ",P(g.scorer_id),g.assist_id?` (пас: ${P(g.assist_id)})`:""),el("button",{class:"b",onclick:()=>delGoal(g)},"✕"))))}
+
+function pickAssist(t,scorer){
+  const close=()=>sh.remove();
+  const sh=el("div",{class:"sheet",onclick:close},el("div",{onclick:e=>e.stopPropagation()},
+    el("div",{class:"hint"},`Гол: ${scorer.name}. Кто отдал пас?`),
+    el("button",{class:"pl",style:"background:#475569",onclick:()=>{close();addGoal(t,scorer.id,null)}},"Без ассиста"),
+    ...mine(t.id).filter(p=>p.id!==scorer.id).map(p=>el("button",{class:"pl",style:`background:${t.color}`,onclick:()=>{close();addGoal(t,scorer.id,p.id)}},p.name)),
+    el("button",{class:"b wide",onclick:close},"Отмена")));
+  document.body.append(sh)}
+
+function addGoal(t,scorer,assist){
+  const g={id:crypto.randomUUID(),match_id:S.match.id,team_id:t.id,scorer_id:scorer,assist_id:assist};
+  S.goals.push(g);buzz();
+  enqueue("add_goal",{p_match:g.match_id,p_team:t.id,p_scorer:scorer,p_assist:assist,p_goal_id:g.id});draw()}
+function delGoal(g){ask("Удалить гол?",()=>{S.goals=S.goals.filter(x=>x.id!==g.id);enqueue("delete_goal",{p_goal:g.id});draw()})}
+
+// ===== админы (только владелец) =====
+async function adminsView(){
+  try{const a=await call("list_admins");
+    const id=el("input",{placeholder:"Telegram-id",inputmode:"numeric"}),nm=el("input",{placeholder:"Имя"});
+    $.replaceChildren(top("Админы",()=>{S.view="home";draw()}),
+      ...a.map(x=>el("div",{class:"row"},el("div",{class:"n"},`${x.display_name} `,el("span",{class:"hint"},`${x.telegram_id} · ${x.role}${x.is_active?"":" · отключён"}`)),
+        x.telegram_id===S.me.id?null:el("button",{class:"b",onclick:async()=>{try{await call("set_admin_active",{p_target:x.telegram_id,p_active:!x.is_active});adminsView()}catch(e){say(e.message)}}},x.is_active?"Отключить":"Включить"))),
+      el("div",{class:"hint",style:"margin-top:14px"},"Новый админ"),id,nm,
+      el("button",{class:"b p wide",onclick:async()=>{try{await call("add_admin",{p_new:Number(id.value),p_name:nm.value.trim()||"Админ"});adminsView()}catch(e){say(e.message)}}},"Добавить"))}
+  catch(e){say(e.message)}}
+
+// ===== старт =====
+(async()=>{
+  try{$.textContent="Загрузка…";
+    const [pl,teams]=await Promise.all([get("players?select=id,name,is_active&order=name"),get("teams?select=id,code,name,color")]);
+    S.players=pl.map(p=>({...p,name:p.name.trim()}));
+    S.teams=["blue","red","green"].map(c=>teams.find(t=>t.code===c)).filter(Boolean);
+    S.me=await call("whoami");await loadTours();draw()}
+  catch(e){const u=tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user;
+    $.textContent=e.message==="not_admin"?`Нет доступа. Ваш Telegram-id: ${u?u.id:"?"}. Передайте его владельцу.`:e.message==="bad_auth"?"Откройте приложение через Telegram.":"Ошибка: "+e.message}
+})();
+</script>
+</body>
+</html>
